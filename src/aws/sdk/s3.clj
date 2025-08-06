@@ -33,6 +33,8 @@
            com.amazonaws.services.s3.model.Owner
            com.amazonaws.services.s3.model.ObjectMetadata
            com.amazonaws.services.s3.model.ObjectListing
+           com.amazonaws.services.s3.model.ObjectTagging
+           com.amazonaws.services.s3.model.Tag
            com.amazonaws.services.s3.model.Permission
            com.amazonaws.services.s3.model.PutObjectRequest
            com.amazonaws.services.s3.model.S3Object
@@ -172,7 +174,8 @@
                                            :content-length
                                            :content-md5
                                            :content-type
-                                           :server-side-encryption)))))
+                                           :server-side-encryption
+                                           :tags)))))
 
 (defn- ^PutObjectRequest ->PutObjectRequest
   "Create a PutObjectRequest instance from a bucket name, key and put request
@@ -205,15 +208,22 @@
     :content-md5            - the MD5 sum of the content
     :content-type           - the mime type of the content
     :server-side-encryption - set to AES256 if SSE is required
+    :tags                   - {key val}
 
   An optional list of grant functions can be provided after metadata.
   These functions will be applied to a clear ACL and the result will be
   the ACL for the newly created object."
   [cred bucket key value & [metadata & permissions]]
+
   (let [req (->> (merge (put-request value) metadata)
                  (->PutObjectRequest bucket key))]
+
+    (when-let [tags-map (not-empty (:tags metadata))]
+      (.setTagging req (ObjectTagging. (for [[k v] tags-map] (Tag. (name k) (str v))))))
+
     (when permissions
       (.setAccessControlList req (create-acl permissions)))
+
     (.putObject (s3-client cred) req)))
 
 (defn- initiate-multipart-upload
